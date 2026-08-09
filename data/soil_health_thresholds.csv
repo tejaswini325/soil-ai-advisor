@@ -1,0 +1,13 @@
+parameter,low_threshold,optimal_low,optimal_high,high_threshold,unit,deficiency_symptoms,excess_symptoms
+ph,4.5,6.0,7.5,8.5,pH units,"Nutrient toxicity (Al/Mn), poor root growth","Micronutrient deficiency (Fe/Mn/Zn), reduced absorption"
+nitrogen,100,280,560,840,kg/ha,"Yellowing of older leaves, stunted growth, pale green color","Excessive vegetative growth, delayed maturity, lodging"
+phosphorus,10,25,50,100,kg/ha,"Purple/reddish discoloration, poor root development, delayed maturity","Zinc/iron deficiency induced, environmental pollution"
+potassium,100,150,280,400,kg/ha,"Marginal leaf scorch, weak stems, poor drought resistance","Calcium/magnesium deficiency, salt stress"
+organic_matter,0.5,2.0,4.0,6.0,percent,"Poor soil structure, low water retention, low microbial activity","Rare; excess may indicate waterlogging"
+electrical_conductivity,0,0,1.0,4.0,dS/m,"Normal if low","Ion toxicity, osmotic stress, reduced germination"
+sulphur,5,10,40,80,ppm,"Inter-veinal chlorosis in young leaves, stunted root growth","Rare under field conditions"
+zinc,0.3,0.5,3.0,10.0,ppm,"Khaira disease in rice, little leaf in fruit crops","Phytotoxicity, interference with P and Fe uptake"
+boron,0.3,0.5,2.0,5.0,ppm,"Die-back, distorted young leaves, poor fruit set","Leaf margin necrosis, tip burn"
+iron,2.0,4.0,40.0,100.0,ppm,"Inter-veinal chlorosis young leaves (lime-induced)","Bronzing in rice, phosphorus fixation"
+manganese,1.0,2.0,50.0,100.0,ppm,"Inter-veinal chlorosis, grey speck in oats","Black speck on seeds, root browning"
+copper,0.1,0.2,1.0,5.0,ppm,"Reclamation disease, blueing of cereals","Phytotoxicity, root damage, iron deficiency induced"

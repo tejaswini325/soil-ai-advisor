@@ -1,0 +1,141 @@
+/* ── Global ─────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+html, body, [class*="css"] {
+    font-family: 'Inter', sans-serif;
+}
+
+/* ── Header Titles ──────────────────────────────── */
+.main-title {
+    font-size: 2.2rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #1a7f37, #2ea44f, #56d364);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.2rem;
+}
+
+.subtitle {
+    color: #57606a;
+    font-size: 1.05rem;
+    margin-bottom: 1.5rem;
+}
+
+/* ── Cards ──────────────────────────────────────── */
+.info-card {
+    background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+    border: 1px solid #bbf7d0;
+    border-radius: 12px;
+    padding: 1.2rem;
+    margin-bottom: 0.8rem;
+    min-height: 100px;
+}
+
+/* ── Rating Badge ───────────────────────────────── */
+.rating-badge {
+    display: inline-block;
+    color: white;
+    font-weight: 700;
+    font-size: 1.1rem;
+    padding: 0.5rem 1.5rem;
+    border-radius: 24px;
+    margin-bottom: 1.2rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+/* ── Concern / Tip Items ────────────────────────── */
+.concern-item {
+    background: #fff7ed;
+    border-left: 4px solid #f97316;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+    border-radius: 0 8px 8px 0;
+    font-size: 0.96rem;
+}
+
+.tip-item {
+    background: #f0fdf4;
+    border-left: 4px solid #22c55e;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+    border-radius: 0 8px 8px 0;
+    font-size: 0.96rem;
+}
+
+/* ── Cost Summary ───────────────────────────────── */
+.cost-summary {
+    background: linear-gradient(135deg, #1e3a5f, #2563eb);
+    color: white;
+    padding: 1.2rem 1.8rem;
+    border-radius: 12px;
+    font-size: 1.2rem;
+    margin: 1rem 0;
+    box-shadow: 0 4px 16px rgba(37,99,235,0.3);
+}
+
+/* ── Chat Bubbles ───────────────────────────────── */
+.chat-user {
+    background: linear-gradient(135deg, #dbeafe, #bfdbfe);
+    border-radius: 18px 18px 4px 18px;
+    padding: 0.8rem 1.2rem;
+    margin: 0.5rem 0 0.5rem 20%;
+    font-size: 0.95rem;
+    border: 1px solid #93c5fd;
+}
+
+.chat-bot {
+    background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+    border-radius: 18px 18px 18px 4px;
+    padding: 0.8rem 1.2rem;
+    margin: 0.5rem 20% 0.5rem 0;
+    font-size: 0.95rem;
+    border: 1px solid #86efac;
+}
+
+/* ── Range Badge ────────────────────────────────── */
+.range-badge {
+    background: #f0fdf4;
+    border: 1px solid #86efac;
+    color: #15803d;
+    border-radius: 8px;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
+    font-weight: 500;
+}
+
+/* ── Sidebar ────────────────────────────────────── */
+.sidebar-footer {
+    background: #f8fafc;
+    border-radius: 8px;
+    padding: 0.8rem;
+    font-size: 0.82rem;
+    color: #57606a;
+    line-height: 1.8;
+    border: 1px solid #e2e8f0;
+}
+
+/* ── Form Submit Button ─────────────────────────── */
+.stButton > button[kind="primary"] {
+    background: linear-gradient(135deg, #1a7f37, #2ea44f) !important;
+    border: none !important;
+    font-weight: 600 !important;
+    font-size: 1rem !important;
+    padding: 0.6rem 1.5rem !important;
+    border-radius: 8px !important;
+    box-shadow: 0 4px 12px rgba(26,127,55,0.3) !important;
+}
+
+/* ── Expander ───────────────────────────────────── */
+details[open] summary {
+    font-weight: 600;
+}
+
+/* ── Tabs ───────────────────────────────────────── */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 8px;
+}
+
+.stTabs [data-baseweb="tab"] {
+    border-radius: 8px 8px 0 0 !important;
+    font-weight: 500 !important;
+}
