@@ -431,7 +431,7 @@ Do not insert raw line breaks inside JSON string values; keep each value as a si
     with st.spinner("🧪 Analyzing soil data..."):
         try:
             response = get_groq_client().chat.completions.create(
-                model="llama-3.1-8b-instant",
+                model="openai/gpt-oss-20b",
                 max_tokens=4000,
                 response_format={"type": "json_object"},
                 messages=[{"role": "user", "content": prompt}]
@@ -515,7 +515,7 @@ Rules:
 
     try:
         response = get_groq_client().chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="openai/gpt-oss-20b",
             max_tokens=800,
             messages=messages
         )
@@ -537,7 +537,7 @@ Return ONLY the translated JSON, no extra text.
 {json.dumps(term_data, ensure_ascii=False)}"""
     try:
         response = get_groq_client().chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="openai/gpt-oss-20b",
             max_tokens=300,
             messages=[{"role": "user", "content": prompt}]
         )
