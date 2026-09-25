@@ -18,53 +18,54 @@ st.set_page_config(
 )
 
 # ─────────────────────────────────────────────
-# Load CSS
-# ─────────────────────────────────────────────
-with open("assets/style.css") as f:
-    st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
-
-# ─────────────────────────────────────────────
-# Constants
+# Paths (defined BEFORE any file access — this was a bug: the CSS
+# was being opened with a bare relative path before BASE_DIR existed,
+# which breaks the whole app if Streamlit's cwd isn't the repo root)
 # ─────────────────────────────────────────────
 BASE_DIR = Path(__file__).parent
+ASSETS_DIR = BASE_DIR / "assets"
 load_dotenv(BASE_DIR / ".env")
 
-client = None
+# ─────────────────────────────────────────────
+# Load CSS safely — a missing assets/style.css used to crash the
+# entire app on load with no useful error. Now it degrades gracefully.
+# ─────────────────────────────────────────────
+css_path = ASSETS_DIR / "style.css"
+if css_path.exists():
+    with open(css_path, encoding="utf-8") as f:
+        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+else:
+    st.warning("⚠️ assets/style.css not found — running with default styling.")
 
 
+# ─────────────────────────────────────────────
+# Groq client (cached properly across reruns with st.cache_resource;
+# the old `global client` pattern did nothing since the whole module
+# re-executes on every Streamlit rerun anyway)
+# ─────────────────────────────────────────────
+@st.cache_resource(show_spinner=False)
 def get_groq_client():
-    global client
+    api_key = ""
 
-    if client is None:
-        api_key = ""
+    # Streamlit Cloud secrets
+    try:
+        api_key = st.secrets.get("GROQ_API_KEY", "")
+    except Exception:
+        pass
 
-        # Streamlit Cloud secrets
-        try:
-            api_key = st.secrets.get("GROQ_API_KEY", "")
-        except Exception:
-            pass
+    # Local .env fallback
+    if not api_key:
+        api_key = os.getenv("GROQ_API_KEY", "") or os.getenv("GROK_API_KEY", "")
 
-        # Local .env fallback
-        if not api_key:
-            api_key = (
-                os.getenv("GROQ_API_KEY", "")
-                or os.getenv("GROK_API_KEY", "")
-            )
+    api_key = api_key.strip().strip('"').strip("'")
 
-        api_key = api_key.strip().strip('"').strip("'")
-
-        if not api_key or api_key == "groq-your-key-here":
-            raise RuntimeError(
-                "GROQ_API_KEY is missing. Add your Groq API key "
-                "to Streamlit Secrets or the local .env file."
-            )
-
-        client = OpenAI(
-            api_key=api_key,
-            base_url="https://api.groq.com/openai/v1"
+    if not api_key or api_key == "groq-your-key-here":
+        raise RuntimeError(
+            "GROQ_API_KEY is missing. Add your Groq API key "
+            "to Streamlit Secrets (Settings → Secrets) or a local .env file."
         )
 
-    return client
+    return OpenAI(api_key=api_key, base_url="https://api.groq.com/openai/v1")
 
 
 def response_text(response):
@@ -249,11 +250,12 @@ VOCABULARY = {
 # ─────────────────────────────────────────────
 for key, val in {
     "report_generated": False,
-    "soil_report": "",
+    "soil_report_data": None,
     "fert_data": [],
     "chat_history": [],
     "soil_inputs": {},
     "selected_language": "English",
+    "chat_input_value": "",
 }.items():
     if key not in st.session_state:
         st.session_state[key] = val
@@ -322,9 +324,12 @@ def local_report(inputs):
             ph_status = "Suitable"
 
     nutrient_rows = [
-        ("Nitrogen", classify_value(nitrogen, 140, 280), 120 if nitrogen is None or nitrogen < 140 else 60 if nitrogen <= 280 else 0),
-        ("Phosphorus", classify_value(phosphorus, 10, 25), 60 if phosphorus is None or phosphorus < 10 else 30 if phosphorus <= 25 else 0),
-        ("Potassium", classify_value(potassium, 100, 280), 60 if potassium is None or potassium < 100 else 30 if potassium <= 280 else 0),
+        ("Nitrogen", classify_value(nitrogen, 140, 280),
+         120 if nitrogen is None or nitrogen < 140 else 60 if nitrogen <= 280 else 0),
+        ("Phosphorus", classify_value(phosphorus, 10, 25),
+         60 if phosphorus is None or phosphorus < 10 else 30 if phosphorus <= 25 else 0),
+        ("Potassium", classify_value(potassium, 100, 280),
+         60 if potassium is None or potassium < 100 else 30 if potassium <= 280 else 0),
     ]
 
     concerns = []
@@ -430,14 +435,20 @@ Do not insert raw line breaks inside JSON string values; keep each value as a si
 
     with st.spinner("🧪 Analyzing soil data..."):
         try:
-            response = get_groq_client().chat.completions.create(
+            client = get_groq_client()
+        except Exception as exc:
+            st.warning(f"AI API unavailable, using local fallback report. Details: {exc}")
+            return local_report(inputs)
+
+        try:
+            response = client.chat.completions.create(
                 model="openai/gpt-oss-20b",
                 max_tokens=4000,
                 response_format={"type": "json_object"},
                 messages=[{"role": "user", "content": prompt}]
             )
         except Exception as exc:
-            st.warning(f"AI API unavailable, using local fallback report. Details: {exc}")
+            st.warning(f"AI API request failed, using local fallback report. Details: {exc}")
             return local_report(inputs)
 
     raw = response_text(response)
@@ -460,9 +471,13 @@ def calculate_fertiliser_products(fert_recs, farm_size_acres):
     }
 
     for rec in fert_recs:
-        nutrient_name = rec.get("nutrient", "")
+        nutrient_name = rec.get("nutrient", "") or ""
         dose = rec.get("recommended_dose_kg_per_ha")
         if dose is None or rec.get("status") == "Adequate":
+            continue
+        try:
+            dose = float(dose)
+        except (TypeError, ValueError):
             continue
 
         matched_key = None
@@ -474,7 +489,7 @@ def calculate_fertiliser_products(fert_recs, farm_size_acres):
         if matched_key and matched_key in FERTILISER_PRODUCTS:
             products = FERTILISER_PRODUCTS[matched_key]
             for prod in products[:2]:
-                content_key = [k for k in prod if "content" in k]
+                content_key = [k for k in prod if k.endswith("_content")]
                 if content_key:
                     content = prod[content_key[0]]
                     qty_per_ha = dose / content
@@ -514,16 +529,18 @@ Rules:
     messages.append({"role": "user", "content": user_msg})
 
     try:
-        response = get_groq_client().chat.completions.create(
+        client = get_groq_client()
+        response = client.chat.completions.create(
             model="openai/gpt-oss-20b",
             max_tokens=800,
             messages=messages
         )
         return response_text(response)
-    except Exception:
+    except Exception as exc:
         return (
-            "The AI chat service is currently unavailable because the configured API key has no access or credits. "
-            "Please use the generated soil report and fertiliser table, or configure a valid API key."
+            "The AI chat service is currently unavailable "
+            f"({exc}). Please use the generated soil report and fertiliser table, "
+            "or configure a valid GROQ_API_KEY."
         )
 
 
@@ -531,12 +548,13 @@ def translate_vocab(term_data, language):
     lang = LANGUAGES.get(language, "English")
     if lang == "English":
         return term_data
-    prompt = f"""Translate the following agricultural glossary entry to {lang}. 
+    prompt = f"""Translate the following agricultural glossary entry to {lang}.
 Return ONLY the translated JSON, no extra text.
 
 {json.dumps(term_data, ensure_ascii=False)}"""
     try:
-        response = get_groq_client().chat.completions.create(
+        client = get_groq_client()
+        response = client.chat.completions.create(
             model="openai/gpt-oss-20b",
             max_tokens=300,
             messages=[{"role": "user", "content": prompt}]
@@ -550,13 +568,19 @@ Return ONLY the translated JSON, no extra text.
 # Sidebar
 # ─────────────────────────────────────────────
 with st.sidebar:
-    st.image("assets/logo.png", use_container_width=True)
+    logo_path = ASSETS_DIR / "logo.png"
+    if logo_path.exists():
+        st.image(str(logo_path), use_container_width=True)
+    else:
+        st.markdown("### 🌱 AI Soil Advisor")
+
     st.markdown("## ⚙️ Settings")
 
     selected_language = st.selectbox(
         "🌐 Select Language / भाषा चुनें",
         list(LANGUAGES.keys()),
-        index=0,
+        index=list(LANGUAGES.keys()).index(st.session_state.selected_language)
+        if st.session_state.selected_language in LANGUAGES else 0,
         help="All reports, tips, and chatbot responses will be in this language"
     )
     st.session_state.selected_language = selected_language
@@ -600,14 +624,14 @@ if "Soil Analysis" in page:
 
         col4, col5 = st.columns(2)
         with col4:
-            farm_size = st.number_input("Farm Size (acres)", min_value=0.0, value=1.0, step=0.5)
+            farm_size = st.number_input("Farm Size (acres)", min_value=0.1, value=1.0, step=0.5)
         with col5:
             season_opts = ["Kharif (June-Nov)", "Rabi (Nov-Apr)", "Zaid (Apr-Jun)", "Year-round", "NA"]
             season = st.selectbox("Season", season_opts)
 
         st.markdown("---")
         st.markdown("### 🧪 Primary Soil Parameters")
-        st.caption("💡 Select 'NA' if the value is not available in your soil report")
+        st.caption("💡 Leave a field blank if the value is not available in your soil report")
 
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -635,7 +659,7 @@ if "Soil Analysis" in page:
 
         st.markdown("---")
         with st.expander("🔬 Micronutrients (ppm) — Optional"):
-            st.caption("Leave as 'NA' if not tested")
+            st.caption("Leave blank if not tested")
             col1, col2, col3 = st.columns(3)
             with col1:
                 zn_input = st.text_input("Zinc (Zn)", placeholder="NA")
@@ -650,16 +674,23 @@ if "Soil Analysis" in page:
         submitted = st.form_submit_button("🔍 Generate Soil Health Report", use_container_width=True, type="primary")
 
     if submitted:
+        # Text inputs default to "" when left blank — normalize that to "NA"
+        # (previously blank strings passed straight through and confused the
+        # LLM/local-fallback numeric parsing).
+        def norm(v):
+            v = (v or "").strip()
+            return v if v else "NA"
+
         inputs = {
             "crop": crop, "soil_type": soil_type if soil_type != "NA" else None,
-            "state": state, "farm_size": farm_size,
+            "state": state.strip() or None, "farm_size": farm_size,
             "season": season if season != "NA" else None,
-            "ph": ph_input, "ec": ec_input, "organic_carbon": oc_input,
-            "nitrogen": n_input, "phosphorus": p_input, "potassium": k_input,
-            "calcium": ca_input, "magnesium": mg_input,
-            "zinc": zn_input, "iron": fe_input,
-            "manganese": mn_input, "copper": cu_input,
-            "boron": b_input, "sulphur": s_input,
+            "ph": norm(ph_input), "ec": norm(ec_input), "organic_carbon": norm(oc_input),
+            "nitrogen": norm(n_input), "phosphorus": norm(p_input), "potassium": norm(k_input),
+            "calcium": norm(ca_input), "magnesium": norm(mg_input),
+            "zinc": norm(zn_input), "iron": norm(fe_input),
+            "manganese": norm(mn_input), "copper": norm(cu_input),
+            "boron": norm(b_input), "sulphur": norm(s_input),
         }
         st.session_state.soil_inputs = inputs
 
@@ -667,15 +698,14 @@ if "Soil Analysis" in page:
             result = generate_report(inputs, selected_language)
             st.session_state.soil_report_data = result
             st.session_state.report_generated = True
-            farm_size_val = float(farm_size) if farm_size else 1.0
             fert_data = calculate_fertiliser_products(
-                result.get("fertiliser_recommendations", []), farm_size_val
+                result.get("fertiliser_recommendations", []), float(farm_size)
             )
             st.session_state.fert_data = fert_data
         except Exception as e:
             st.error(f"Error generating report: {e}")
 
-    if st.session_state.report_generated and "soil_report_data" in st.session_state:
+    if st.session_state.report_generated and st.session_state.soil_report_data:
         data = st.session_state.soil_report_data
         report = data.get("soil_health_report", {})
         fert_recs = data.get("fertiliser_recommendations", [])
@@ -721,16 +751,27 @@ if "Soil Analysis" in page:
                 st.info(report.get("micronutrient_analysis", ""))
 
         with tab2:
-            for c in report.get("key_concerns", []):
-                st.markdown(f"<div class='concern-item'>⚠️ {c}</div>", unsafe_allow_html=True)
+            concerns = report.get("key_concerns", [])
+            if concerns:
+                for c in concerns:
+                    st.markdown(f"<div class='concern-item'>⚠️ {c}</div>", unsafe_allow_html=True)
+            else:
+                st.write("No specific concerns listed.")
 
         with tab3:
-            for i, tip in enumerate(report.get("management_tips", []), 1):
-                st.markdown(f"<div class='tip-item'>✅ **Tip {i}:** {tip}</div>", unsafe_allow_html=True)
+            tips = report.get("management_tips", [])
+            if tips:
+                for i, tip in enumerate(tips, 1):
+                    st.markdown(f"<div class='tip-item'>✅ <b>Tip {i}:</b> {tip}</div>", unsafe_allow_html=True)
+            else:
+                st.write("No tips available.")
 
         with tab4:
-            for ref in references:
-                st.markdown(f"📌 {ref}")
+            if references:
+                for ref in references:
+                    st.markdown(f"📌 {ref}")
+            else:
+                st.write("No references listed.")
 
         st.markdown("---")
         st.markdown("## 🌿 Fertiliser Recommendations")
@@ -745,6 +786,8 @@ if "Soil Analysis" in page:
                     "recommended_dose_kg_per_ha": st.column_config.NumberColumn("Dose (kg/ha)"),
                 }
             )
+        else:
+            st.write("No fertiliser recommendations returned.")
 
 # ─────────────────────────────────────────────
 # PAGE 2: Fertiliser Calculator
@@ -753,13 +796,13 @@ elif "Fertiliser Calculator" in page:
     st.markdown("<h1 class='main-title'>💊 Fertiliser Product & Cost Calculator</h1>", unsafe_allow_html=True)
     st.markdown("<p class='subtitle'>Convert nutrient recommendations into actual fertiliser products with quantity and cost estimates</p>", unsafe_allow_html=True)
 
-    if not st.session_state.report_generated:
+    if not st.session_state.report_generated or not st.session_state.soil_report_data:
         st.warning("⚠️ Please generate a soil health report first from the **Soil Analysis** page.")
     else:
         data = st.session_state.soil_report_data
         fert_recs = data.get("fertiliser_recommendations", [])
         inputs = st.session_state.soil_inputs
-        farm_size = float(inputs.get("farm_size", 1.0))
+        farm_size = float(inputs.get("farm_size", 1.0) or 1.0)
         farm_size_ha = farm_size * 0.4047
 
         st.info(f"🌾 Farm: **{farm_size} acres** ({round(farm_size_ha, 2)} ha) | Crop: **{inputs.get('crop', 'N/A')}**")
@@ -812,18 +855,19 @@ elif "Chatbot" in page:
     st.markdown("<h1 class='main-title'>🤖 AI Soil Advisory Chatbot</h1>", unsafe_allow_html=True)
     st.markdown("<p class='subtitle'>Ask any farming or soil-related question in your preferred language</p>", unsafe_allow_html=True)
 
-    if st.session_state.report_generated and "soil_report_data" in st.session_state:
+    if st.session_state.report_generated and st.session_state.soil_report_data:
         data = st.session_state.soil_report_data
         inputs = st.session_state.soil_inputs
+        health = data.get("soil_health_report", {})
         soil_context = f"""
 SOIL INPUTS:
 {build_soil_summary(inputs)}
 
 REPORT SUMMARY:
-{data['soil_health_report'].get('summary', '')}
+{health.get('summary', '')}
 
 KEY CONCERNS:
-{chr(10).join(data['soil_health_report'].get('key_concerns', []))}
+{chr(10).join(health.get('key_concerns', []))}
 
 FERTILISER RECOMMENDATIONS:
 {json.dumps(data.get('fertiliser_recommendations', []), ensure_ascii=False, indent=2)}
@@ -847,6 +891,7 @@ FERTILISER RECOMMENDATIONS:
             with st.spinner("Thinking..."):
                 reply = chat_with_advisor(sugg, st.session_state.chat_history[:-1], soil_context, selected_language)
             st.session_state.chat_history.append({"role": "assistant", "content": reply})
+            st.rerun()
 
     chat_container = st.container()
     with chat_container:
@@ -856,21 +901,25 @@ FERTILISER RECOMMENDATIONS:
             else:
                 st.markdown(f"<div class='chat-bot'>🤖 {msg['content']}</div>", unsafe_allow_html=True)
 
-    col1, col2 = st.columns([5, 1])
-    with col1:
-        user_input = st.text_input(
-            "Ask your question...",
-            placeholder="e.g. My soil pH is 5.5, what should I add?",
-            key="chat_input",
-            label_visibility="collapsed"
-        )
-    with col2:
-        send_btn = st.button("Send 📨", use_container_width=True, type="primary")
+    # Using a form with clear_on_submit=True fixes a real bug: the plain
+    # text_input kept its stale text in the box after every send because
+    # its session_state key persisted across the st.rerun() call.
+    with st.form("chat_form", clear_on_submit=True):
+        col1, col2 = st.columns([5, 1])
+        with col1:
+            user_input = st.text_input(
+                "Ask your question...",
+                placeholder="e.g. My soil pH is 5.5, what should I add?",
+                key="chat_input",
+                label_visibility="collapsed"
+            )
+        with col2:
+            send_btn = st.form_submit_button("Send 📨", use_container_width=True, type="primary")
 
     if send_btn and user_input.strip():
-        st.session_state.chat_history.append({"role": "user", "content": user_input})
+        st.session_state.chat_history.append({"role": "user", "content": user_input.strip()})
         with st.spinner("Thinking..."):
-            reply = chat_with_advisor(user_input, st.session_state.chat_history[:-1], soil_context, selected_language)
+            reply = chat_with_advisor(user_input.strip(), st.session_state.chat_history[:-1], soil_context, selected_language)
         st.session_state.chat_history.append({"role": "assistant", "content": reply})
         st.rerun()
 
