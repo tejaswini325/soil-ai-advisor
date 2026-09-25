@@ -611,41 +611,41 @@ if "Soil Analysis" in page:
 
         col1, col2, col3 = st.columns(3)
         with col1:
-            ph_input = st.text_input("pH", value="NA", help="Soil pH (0-14). Typical: 6.0-7.5")
+            ph_input = st.text_input("pH", placeholder="NA", help="Soil pH (0-14). Typical: 6.0-7.5")
         with col2:
-            ec_input = st.text_input("EC (dS/m)", value="NA", help="Electrical Conductivity")
+            ec_input = st.text_input("EC (dS/m)", placeholder="NA", help="Electrical Conductivity")
         with col3:
-            oc_input = st.text_input("Organic Carbon (%)", value="NA", help="OC%: Low <0.5, Medium 0.5-0.75, High >0.75")
+            oc_input = st.text_input("Organic Carbon (%)", placeholder="NA", help="OC%: Low <0.5, Medium 0.5-0.75, High >0.75")
 
         st.markdown("#### Macronutrients (kg/ha)")
         col1, col2, col3 = st.columns(3)
         with col1:
-            n_input = st.text_input("Nitrogen (N)", value="NA")
+            n_input = st.text_input("Nitrogen (N)", placeholder="NA")
         with col2:
-            p_input = st.text_input("Phosphorus (P)", value="NA")
+            p_input = st.text_input("Phosphorus (P)", placeholder="NA")
         with col3:
-            k_input = st.text_input("Potassium (K)", value="NA")
+            k_input = st.text_input("Potassium (K)", placeholder="NA")
 
         st.markdown("#### Secondary Nutrients (meq/100g)")
         col1, col2 = st.columns(2)
         with col1:
-            ca_input = st.text_input("Calcium (Ca)", value="NA")
+            ca_input = st.text_input("Calcium (Ca)", placeholder="NA")
         with col2:
-            mg_input = st.text_input("Magnesium (Mg)", value="NA")
+            mg_input = st.text_input("Magnesium (Mg)", placeholder="NA")
 
         st.markdown("---")
         with st.expander("🔬 Micronutrients (ppm) — Optional"):
             st.caption("Leave as 'NA' if not tested")
             col1, col2, col3 = st.columns(3)
             with col1:
-                zn_input = st.text_input("Zinc (Zn)", value="NA")
-                fe_input = st.text_input("Iron (Fe)", value="NA")
+                zn_input = st.text_input("Zinc (Zn)", placeholder="NA")
+                fe_input = st.text_input("Iron (Fe)", placeholder="NA")
             with col2:
-                mn_input = st.text_input("Manganese (Mn)", value="NA")
-                cu_input = st.text_input("Copper (Cu)", value="NA")
+                mn_input = st.text_input("Manganese (Mn)", placeholder="NA")
+                cu_input = st.text_input("Copper (Cu)", placeholder="NA")
             with col3:
-                b_input = st.text_input("Boron (B)", value="NA")
-                s_input = st.text_input("Sulphur (S) ppm", value="NA")
+                b_input = st.text_input("Boron (B)", placeholder="NA")
+                s_input = st.text_input("Sulphur (S) ppm", placeholder="NA")
 
         submitted = st.form_submit_button("🔍 Generate Soil Health Report", use_container_width=True, type="primary")
 
