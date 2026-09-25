@@ -33,22 +33,37 @@ client = None
 
 
 def get_groq_client():
-    """Create the Groq client from .env only when it is needed."""
     global client
+
     if client is None:
-        api_key = (
-            os.getenv("GROQ_API_KEY", "")
-            or os.getenv("GROK_API_KEY", "")
-        ).strip().strip('"').strip("'")
+        api_key = ""
+
+        # Streamlit Cloud secrets
+        try:
+            api_key = st.secrets.get("GROQ_API_KEY", "")
+        except Exception:
+            pass
+
+        # Local .env fallback
+        if not api_key:
+            api_key = (
+                os.getenv("GROQ_API_KEY", "")
+                or os.getenv("GROK_API_KEY", "")
+            )
+
+        api_key = api_key.strip().strip('"').strip("'")
+
         if not api_key or api_key == "groq-your-key-here":
             raise RuntimeError(
-                "GROQ_API_KEY is missing. Add your real Groq key in the project .env file, "
-                "then restart Streamlit."
+                "GROQ_API_KEY is missing. Add your Groq API key "
+                "to Streamlit Secrets or the local .env file."
             )
+
         client = OpenAI(
             api_key=api_key,
             base_url="https://api.groq.com/openai/v1"
         )
+
     return client
 
 
